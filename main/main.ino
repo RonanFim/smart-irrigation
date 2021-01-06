@@ -11,16 +11,19 @@
 // ----------------------------------------------------------------
 
 #include <RTClib.h>
+#include "TimePoint.h"
 
-#define START_HOUR 20
-#define START_MIN  49
-#define START_SEC  0
-#define END_HOUR 20
-#define END_MIN  50
-#define END_SEC  0
+#define ONE_DAY_IN_SECS 86400
+#define VALVE_PIN 4
 
 RTC_DS1307 rtc;
 bool valve = false;
+
+// Start and End times to turn the valve on
+const TimePoint start_point(20, 42, 0);
+const TimePoint end_point(20, 43, 0);
+uint32_t start_time;
+uint32_t end_time;
 
 void setup()
 {
@@ -28,6 +31,10 @@ void setup()
         ;
 
     Serial.begin(57600);
+
+    // Configure and turn on the valve
+    pinMode(VALVE_PIN, OUTPUT);
+    digitalWrite(VALVE_PIN, LOW);
 
     while(!rtc.begin())
     {
@@ -37,12 +44,27 @@ void setup()
 
     if(!rtc.isrunning())
     {
+        // Set RTC in the first time
         Serial.println("RTC is not running");
         Serial.println("setting clock...");
+        // (year, month, day, hour, minute, second)
         rtc.adjust(DateTime(2021, 1, 4, 20, 11, 0));
         Serial.println("RTC was set!");
     }
-  
+
+    DateTime now = rtc.now();
+    DateTime start(now.year(), now.month(), now.day(), start_point.hour, start_point.minute, start_point.second);
+    DateTime end(now.year(), now.month(), now.day(), end_point.hour, end_point.minute, end_point.second);
+
+    start_time = start.unixtime();
+    end_time = end.unixtime();
+
+    if(end_time <= start_time)
+        end_time += ONE_DAY_IN_SECS;
+    
+    // Serial.println(start_time);
+    // Serial.println(end_time);
+    // Serial.println("start e end");
 }
 
 void loop() {
@@ -54,40 +76,31 @@ void loop() {
     Serial.print(':');
     Serial.println(now.second(), DEC);
 
+    uint32_t now_time = now.unixtime();
+
     if(!valve)
     {
-        Serial.println("Checando para entrar");
-        if((now.hour() >= START_HOUR) && (now.hour() <= END_HOUR))
-            if((now.minute() >= START_MIN) && (now.minute() <= END_MIN))
-                if((now.second() >= START_SEC) && (now.second() <= END_SEC)) {
-                    valve = true;
-                    Serial.println("valve ativada");
-                }
+        // Serial.println("Checking to turn on");
+        if((now_time >= start_time) && (now_time <= end_time))
+        {
+            valve = true;
+            digitalWrite(VALVE_PIN, HIGH);
+            Serial.println("Valve turned on!");
+        }
     }
     else
     {
-        Serial.println("Checando para sair");
-        if(now.hour() >= END_HOUR)
-            if(now.minute() >= END_MIN)
-                if(now.second() >= END_SEC) {
-                    valve = false;
-                    Serial.println("valve desativada");
-                }
+        // Serial.println("Checking to turn off");
+        if(now_time >= end_time)
+        {
+            valve = false;
+            digitalWrite(VALVE_PIN, LOW);
+            Serial.println("Valve turned off!");
+        }
     }
     
-    Serial.println(valve);
+    // Serial.println(valve);
 
-    /*Serial.print(now.day(), DEC);
-    Serial.print('/');
-    Serial.print(now.month(), DEC);
-    Serial.print('/');
-    Serial.print(now.year(), DEC);
-    Serial.print(" (");
-    Serial.print(now.hour(), DEC);
-    Serial.print(':');
-    Serial.print(now.minute(), DEC);
-    Serial.print(':');
-    Serial.print(now.second(), DEC);
-    Serial.println(")");*/
+    // Test in periods of 5 seconds
     delay(5000);
 }
