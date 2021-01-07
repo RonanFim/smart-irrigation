@@ -32,9 +32,10 @@ void setup()
 
     Serial.begin(57600);
 
-    // Configure and turn on the valve
+    // Configure and turn off the valve
+    // Low level trigger: LOW = ON, HIGH = OFF
     pinMode(VALVE_PIN, OUTPUT);
-    digitalWrite(VALVE_PIN, LOW);
+    digitalWrite(VALVE_PIN, HIGH);
 
     while(!rtc.begin())
     {
@@ -84,7 +85,7 @@ void loop() {
         if((now_time >= start_time) && (now_time <= end_time))
         {
             valve = true;
-            digitalWrite(VALVE_PIN, HIGH);
+            digitalWrite(VALVE_PIN, LOW);
             Serial.println("Valve turned on!");
         }
     }
@@ -94,7 +95,7 @@ void loop() {
         if(now_time >= end_time)
         {
             valve = false;
-            digitalWrite(VALVE_PIN, LOW);
+            digitalWrite(VALVE_PIN, HIGH);
             Serial.println("Valve turned off!");
             // Change the start and end times to the next day
             start_time += ONE_DAY_IN_SECS;
