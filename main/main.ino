@@ -19,9 +19,9 @@
 RTC_DS1307 rtc;
 bool valve = false;
 
-// Start and End times to turn the valve on
-const TimePoint start_point(20, 42, 0);
-const TimePoint end_point(20, 43, 0);
+// Start and End times to turn the valve on (hours, minutes, seconds)
+const TimePoint start_point(17, 0, 0);
+const TimePoint end_point(17, 30, 0);
 uint32_t start_time;
 uint32_t end_time;
 
@@ -49,7 +49,7 @@ void setup()
         Serial.println("RTC is not running");
         Serial.println("setting clock...");
         // (year, month, day, hour, minute, second)
-        rtc.adjust(DateTime(2021, 1, 4, 20, 11, 0));
+        rtc.adjust(DateTime(2021, 2, 25, 18, 50, 0));
         Serial.println("RTC was set!");
     }
 
@@ -105,6 +105,6 @@ void loop() {
     
     // Serial.println(valve);
 
-    // Test in periods of 5 seconds
-    delay(5000);
+    // Test in periods of 10 seconds
+    delay(10000);
 }
