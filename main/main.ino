@@ -98,8 +98,8 @@ void loop() {
             digitalWrite(VALVE_PIN, HIGH);
             Serial.println("Valve turned off!");
             // Change the start and end times to the next day
-            start_time += ONE_DAY_IN_SECS;
-            end_time += ONE_DAY_IN_SECS;
+            start_time += (2 * ONE_DAY_IN_SECS);
+            end_time += (2 * ONE_DAY_IN_SECS);
         }
     }
     
