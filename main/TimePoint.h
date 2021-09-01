@@ -9,6 +9,16 @@ class TimePoint
     uint8_t second;
     TimePoint(uint8_t h, uint8_t m, uint8_t s) : hour(h), minute(m), second(s)
     { }
+    TimePoint()
+    {
+      hour = minute = second = 0;
+    }
+    void setTime(uint8_t h, uint8_t m, uint8_t s)
+    {
+      hour = h;
+      minute = m;
+      second = s;
+    }
 };
 
 #endif

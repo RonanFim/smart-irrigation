@@ -23,16 +23,15 @@
 #define LOOP_DELAY 30               // 30s
 #define TIME_ERROR_THRESHOLD 120    // 2min
 
+#define NUMBER_OF_TIME_POINTS 2     // Number of times the valve will activate per day
+// Start and End times to turn the valve on (hours, minutes, seconds)
+uint32_t start_times[NUMBER_OF_TIME_POINTS];
+uint32_t end_times[NUMBER_OF_TIME_POINTS];
+uint8_t current_time_point_idx = 0;
+
 RTC_DS1307 rtc;
 bool valve = false;
 
-// Start and End times to turn the valve on (hours, minutes, seconds)
-const TimePoint start_point(17, 00, 0);
-const TimePoint end_point(17, 01, 0);
-// const TimePoint start_point(17, 30, 0);
-// const TimePoint end_point(17, 45, 0);
-uint32_t start_time;
-uint32_t end_time;
 
 uint32_t last_timestamp;
 
@@ -43,13 +42,27 @@ T diff(T foo, T bar) {
 
 void setup()
 {
+    // ------------------------------------
+    // Times to activate valve
+    // SET TIMES HERE!!!
+    // ------------------------------------
+    TimePoint start_points[NUMBER_OF_TIME_POINTS];
+    TimePoint end_points[NUMBER_OF_TIME_POINTS];
+    // 1st
+    start_points[0].setTime(19,0,0);
+    end_points[0].setTime(19,1,0);
+    // 2nd
+    start_points[1].setTime(19,3,0);
+    end_points[1].setTime(19,5,0);
+
+
     while(!Serial)
         ;
 
     Serial.begin(57600);
 
+    Serial.println("------ Reset ------");
     delay(3000);
-    Serial.println("Inicio");
 
     // Configure and turn off the valve
     // Low level trigger: LOW = ON, HIGH = OFF
@@ -59,9 +72,6 @@ void setup()
     pinMode(RTC_FAIL_LED_PIN, OUTPUT);
     digitalWrite(RTC_FAIL_LED_PIN, LOW);
 
-    Serial.println("LED apagado");
-    delay(3000);
-
     while(!rtc.begin())
     {
         digitalWrite(RTC_FAIL_LED_PIN, HIGH);
@@ -69,7 +79,7 @@ void setup()
         delay(10000);   // 10s
     }
 
-    if(!rtc.isrunning())
+    while(!rtc.isrunning())
     {
         digitalWrite(RTC_FAIL_LED_PIN, HIGH);
         // Set RTC in the first time
@@ -78,23 +88,30 @@ void setup()
         // (year, month, day, hour, minute, second)
         rtc.adjust(DateTime(2021, 8, 29, 17, 55, 0));
         Serial.println("RTC was set!");
+        delay(10000);       // 10s
     }
 
     digitalWrite(RTC_FAIL_LED_PIN, LOW);
 
     DateTime now = rtc.now();
-    DateTime start(now.year(), now.month(), now.day(), start_point.hour, start_point.minute, start_point.second);
-    DateTime end(now.year(), now.month(), now.day(), end_point.hour, end_point.minute, end_point.second);
 
-    start_time = start.unixtime();
-    end_time = end.unixtime();
+    for(uint8_t i = 0; i < NUMBER_OF_TIME_POINTS; i++)
+    {
+        DateTime start(now.year(), now.month(), now.day(), 
+                    start_points[i].hour,
+                    start_points[i].minute,
+                    start_points[i].second);
+        DateTime end(now.year(), now.month(), now.day(),
+                    end_points[i].hour,
+                    end_points[i].minute,
+                    end_points[i].second);
 
-    if(end_time <= start_time)
-        end_time += ONE_DAY_IN_SECS;
-    
-    // Serial.println(start_time);
-    // Serial.println(end_time);
-    // Serial.println("start e end");
+        start_times[i] = start.unixtime();
+        end_times[i] = end.unixtime();
+
+        if(end_times[i] <= start_times[i])
+            end_times[i] += ONE_DAY_IN_SECS;
+    }
 
     last_timestamp = rtc.now().unixtime();
 }
@@ -132,24 +149,28 @@ void loop() {
     if(!valve)
     {
         // Serial.println("Checking to turn on");
-        if((now_time >= start_time) && (now_time <= end_time))
+        for(uint8_t i = 0; i < NUMBER_OF_TIME_POINTS; i++)
         {
-            valve = true;
-            digitalWrite(VALVE_PIN, LOW);
-            Serial.println("Valve turned on!");
+            if((now_time >= start_times[i]) && (now_time <= end_times[i]))
+            {
+                valve = true;
+                digitalWrite(VALVE_PIN, LOW);
+                Serial.println("Valve turned on!");
+                current_time_point_idx = i;
+            }
         }
     }
     else
     {
         // Serial.println("Checking to turn off");
-        if(now_time >= end_time)
+        if(now_time >= end_times[current_time_point_idx])
         {
             valve = false;
             digitalWrite(VALVE_PIN, HIGH);
             Serial.println("Valve turned off!");
             // Change the start and end times to the next day
-            start_time += ONE_DAY_IN_SECS;
-            end_time += ONE_DAY_IN_SECS;
+            start_times[current_time_point_idx] += ONE_DAY_IN_SECS;
+            end_times[current_time_point_idx] += ONE_DAY_IN_SECS;
         }
     }
     
