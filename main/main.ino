@@ -16,7 +16,10 @@
 #define ONE_DAY_IN_SECS 86400
 #define VALVE_PIN 4
 #define RTC_FAIL_LED_PIN 6
-// #define RTC_FAIL_LED_PIN LED_BUILTIN
+// #define RTC_LOW_BATTERY_LED_PIN 7
+#define RTC_LOW_BATTERY_LED_PIN LED_BUILTIN
+#define RTC_BATTERY_AI_PIN A1
+#define RTC_LOW_BATT_VOLT_THR (2.2)  // 2.2V
 // SDA: A4
 // SCL: A5
 
@@ -49,11 +52,11 @@ void setup()
     TimePoint start_points[NUMBER_OF_TIME_POINTS];
     TimePoint end_points[NUMBER_OF_TIME_POINTS];
     // 1st
-    start_points[0].setTime(19,0,0);
-    end_points[0].setTime(19,1,0);
+    start_points[0].setTime(20,27,0);
+    end_points[0].setTime(20,28,0);
     // 2nd
-    start_points[1].setTime(19,3,0);
-    end_points[1].setTime(19,5,0);
+    start_points[1].setTime(20,30,0);
+    end_points[1].setTime(20,32,0);
 
 
     while(!Serial)
@@ -69,8 +72,13 @@ void setup()
     pinMode(VALVE_PIN, OUTPUT);
     digitalWrite(VALVE_PIN, HIGH);
     
+    // Configure and turn off RTC Fail LED
     pinMode(RTC_FAIL_LED_PIN, OUTPUT);
     digitalWrite(RTC_FAIL_LED_PIN, LOW);
+
+    // Configure and turn off RTC Low Battery LED
+    pinMode(RTC_LOW_BATTERY_LED_PIN, OUTPUT);
+    digitalWrite(RTC_LOW_BATTERY_LED_PIN, LOW);
 
     while(!rtc.begin())
     {
@@ -86,7 +94,7 @@ void setup()
         Serial.println("RTC is not running");
         Serial.println("setting clock...");
         // (year, month, day, hour, minute, second)
-        rtc.adjust(DateTime(2021, 8, 29, 17, 55, 0));
+        rtc.adjust(DateTime(2021, 9, 1, 21, 0, 0));
         Serial.println("RTC was set!");
         delay(10000);       // 10s
     }
@@ -172,6 +180,23 @@ void loop() {
             start_times[current_time_point_idx] += ONE_DAY_IN_SECS;
             end_times[current_time_point_idx] += ONE_DAY_IN_SECS;
         }
+    }
+
+    // Check RTC Battery Voltage
+    float batVolt = (analogRead(RTC_BATTERY_AI_PIN)*5.0)/1024.0;
+    if(batVolt < RTC_LOW_BATT_VOLT_THR)
+    {
+        digitalWrite(RTC_LOW_BATTERY_LED_PIN, HIGH);
+        Serial.print("Low Battery! - ");
+        Serial.print(batVolt);
+        Serial.println("V");
+    }
+    else
+    {
+        digitalWrite(RTC_LOW_BATTERY_LED_PIN, LOW);
+        // Serial.print("Battery OK! - ");
+        // Serial.print(batVolt);
+        // Serial.println("V");
     }
     
     // Serial.println(valve);
