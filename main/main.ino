@@ -12,21 +12,9 @@
 
 #include <RTClib.h>
 #include "TimePoint.h"
+#include "definitions.h"
 
-#define ONE_DAY_IN_SECS 86400
-#define VALVE_PIN 4
-#define RTC_FAIL_LED_PIN 6
-// #define RTC_LOW_BATTERY_LED_PIN 7
-#define RTC_LOW_BATTERY_LED_PIN LED_BUILTIN
-#define RTC_BATTERY_AI_PIN A1
-#define RTC_LOW_BATT_VOLT_THR (2.2)  // 2.2V
-// SDA: A4
-// SCL: A5
 
-#define LOOP_DELAY 30               // 30s
-#define TIME_ERROR_THRESHOLD 120    // 2min
-
-#define NUMBER_OF_TIME_POINTS 2     // Number of times the valve will activate per day
 // Start and End times to turn the valve on (hours, minutes, seconds)
 uint32_t start_times[NUMBER_OF_TIME_POINTS];
 uint32_t end_times[NUMBER_OF_TIME_POINTS];
@@ -35,13 +23,14 @@ uint8_t current_time_point_idx = 0;
 RTC_DS1307 rtc;
 bool valve = false;
 
-
 uint32_t last_timestamp;
+uint8_t batt_read_counter = 0;
 
 template <typename T>
 T diff(T foo, T bar) {
   return (foo > bar) ? (foo - bar) : (bar - foo);
 }
+
 
 void setup()
 {
@@ -52,11 +41,11 @@ void setup()
     TimePoint start_points[NUMBER_OF_TIME_POINTS];
     TimePoint end_points[NUMBER_OF_TIME_POINTS];
     // 1st
-    start_points[0].setTime(20,27,0);
-    end_points[0].setTime(20,28,0);
+    start_points[0].setTime(19,10,0);
+    end_points[0].setTime(19,12,0);
     // 2nd
-    start_points[1].setTime(20,30,0);
-    end_points[1].setTime(20,32,0);
+    start_points[1].setTime(19,15,0);
+    end_points[1].setTime(19,16,0);
 
 
     while(!Serial)
@@ -64,8 +53,13 @@ void setup()
 
     Serial.begin(57600);
 
-    Serial.println("------ Reset ------");
-    delay(3000);
+    Serial.println();
+    Serial.println("-------------------------");
+    Serial.println("--------- Reset ---------");
+    Serial.println("-------------------------");
+    delay(1000);
+
+    Serial.println("Setting things up...");
 
     // Configure and turn off the valve
     // Low level trigger: LOW = ON, HIGH = OFF
@@ -79,6 +73,10 @@ void setup()
     // Configure and turn off RTC Low Battery LED
     pinMode(RTC_LOW_BATTERY_LED_PIN, OUTPUT);
     digitalWrite(RTC_LOW_BATTERY_LED_PIN, LOW);
+
+    // Configure and disable Battery reading
+    pinMode(RTC_BATTERY_ENABLE_READ, OUTPUT);
+    digitalWrite(RTC_BATTERY_ENABLE_READ, LOW);
 
     while(!rtc.begin())
     {
@@ -122,6 +120,8 @@ void setup()
     }
 
     last_timestamp = rtc.now().unixtime();
+
+    Serial.println("Setup completed!");
 }
 
 void loop() {
@@ -138,16 +138,8 @@ void loop() {
     if(diff(now_time, last_timestamp) > TIME_ERROR_THRESHOLD)
     {
         digitalWrite(RTC_FAIL_LED_PIN, HIGH);
-        Serial.println("Time Error!");
-        Serial.print("now time :");
-        Serial.println(now_time);
-        Serial.print("last time:");
-        Serial.println(last_timestamp);
-        Serial.print("Threshold:");
-        Serial.println(TIME_ERROR_THRESHOLD);
-        Serial.print("abs da dif:");
-        Serial.println(abs(now_time - last_timestamp));
-
+        Serial.print("Time Error! - Diff: ");
+        Serial.println(diff(now_time, last_timestamp));
     }
     else
     {
@@ -156,7 +148,7 @@ void loop() {
 
     if(!valve)
     {
-        // Serial.println("Checking to turn on");
+        // Serial.println("Checking to turn valve on");
         for(uint8_t i = 0; i < NUMBER_OF_TIME_POINTS; i++)
         {
             if((now_time >= start_times[i]) && (now_time <= end_times[i]))
@@ -170,7 +162,7 @@ void loop() {
     }
     else
     {
-        // Serial.println("Checking to turn off");
+        // Serial.println("Checking to turn valve off");
         if(now_time >= end_times[current_time_point_idx])
         {
             valve = false;
@@ -182,27 +174,33 @@ void loop() {
         }
     }
 
-    // Check RTC Battery Voltage
-    float batVolt = (analogRead(RTC_BATTERY_AI_PIN)*5.0)/1024.0;
-    if(batVolt < RTC_LOW_BATT_VOLT_THR)
+    batt_read_counter++;
+    if (batt_read_counter >= CYCLES_TO_READ_BATTERY)
     {
-        digitalWrite(RTC_LOW_BATTERY_LED_PIN, HIGH);
-        Serial.print("Low Battery! - ");
-        Serial.print(batVolt);
-        Serial.println("V");
-    }
-    else
-    {
-        digitalWrite(RTC_LOW_BATTERY_LED_PIN, LOW);
-        // Serial.print("Battery OK! - ");
-        // Serial.print(batVolt);
-        // Serial.println("V");
+        // Check RTC Battery Voltage
+        digitalWrite(RTC_BATTERY_ENABLE_READ, HIGH);
+        delay(100);
+        float batVolt = (analogRead(RTC_BATTERY_AI_PIN)*5.0)/1024.0;
+        if(batVolt < RTC_LOW_BATT_VOLT_THR)
+        {
+            digitalWrite(RTC_LOW_BATTERY_LED_PIN, HIGH);
+            Serial.print("Low Battery! - ");
+            Serial.print(batVolt);
+            Serial.println("V");
+        }
+        else
+        {
+            digitalWrite(RTC_LOW_BATTERY_LED_PIN, LOW);
+            Serial.print("Battery OK! - ");
+            Serial.print(batVolt);
+            Serial.println("V");
+        }
+        digitalWrite(RTC_BATTERY_ENABLE_READ, LOW);
+        batt_read_counter = 0;
     }
     
     // Serial.println(valve);
 
     last_timestamp += LOOP_DELAY;
-
-    // Test in periods of 30 seconds
     delay(LOOP_DELAY * 1000);
 }
